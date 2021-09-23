@@ -3,6 +3,7 @@ package com.example.myapplication;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -11,6 +12,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -29,7 +31,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
@@ -51,6 +55,8 @@ public class MainActivity extends AppCompatActivity {
     private int fileCounter=0;
     //final TextView textView = (TextView) findViewById(R.id.textView);
     public String[] activities={"walking","jogging","sitting","standing","upstairs","biking","downstairs"};
+    public Classifier classifier;
+    boolean sw=false;
 
 
     LinkedList<Float[]> readings = new LinkedList<Float[]>();
@@ -76,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         //print model
-        InputStream in = getResources().openRawResource(R.raw.r_pocket_random_tree);
+        InputStream in = getResources().openRawResource(R.raw.rpocket_no_mag);
 //        try {
 //            //RandomTree rf = (RandomTree) (new ObjectInputStream(in)).readObject();
 //            //System.out.println(rf);
@@ -85,6 +91,17 @@ public class MainActivity extends AppCompatActivity {
 //        } catch (IOException e) {
 //            e.printStackTrace();
 //        }
+        AssetManager assetManager = getAssets();
+        try {
+            classifier = (Classifier) (new ObjectInputStream(in)).readObject();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            // Weka "catch'em all!"
+            e.printStackTrace();
+        }
+        Toast.makeText(this, "Model loaded.", Toast.LENGTH_SHORT).show();
 
 
 
@@ -138,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
         startButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 //send request
-                volleyPost(0);
+                volleyPost("nothing");
             }
         });
 
@@ -146,15 +163,98 @@ public class MainActivity extends AppCompatActivity {
         Button stopButton = (Button) findViewById(R.id.button2);
         stopButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-            System.out.println("the readings:");
-            if(!accelerometerReadings.equals(null)) {
+//                if (!sw)
+//                    sw=true;
+//                else sw=false;
 
-                for(int i = 0; i < accelerometerReadings.size(); i++)
-                    System.out.println( accelerometerReadings.get(i)[2] );
-            }
-            else{
-                System.out.println("accelerometer list emty");
-            }
+
+                final Attribute accelerometerX = new Attribute("accelerometerX");
+                final Attribute accelerometerY = new Attribute("accelerometerY");
+                final Attribute accelerometerZ = new Attribute("accelerometerZ");
+//                final Attribute magnetometerX = new Attribute("magnetometerX");
+//                final Attribute magnetometerY = new Attribute("magnetometerY");
+//                final Attribute magnetometerZ = new Attribute("magnetometerZ");
+                final Attribute gyroscopeX = new Attribute("gyroscopeX");
+                final Attribute gyroscopeY = new Attribute("gyroscopeY");
+                final Attribute gyroscopeZ = new Attribute("gyroscopeZ");
+                final Attribute linearX = new Attribute("linearX");
+                final Attribute linearY = new Attribute("linearY");
+                final Attribute linearZ = new Attribute("linearZ");
+                final List<String> classes = new ArrayList<String>() {
+                    {
+                        add("walking"); // cls nr 1
+                        add("standing"); // cls nr 2
+                        add("jogging"); // cls nr 3
+                        add("sitting"); // cls nr 4
+                        add("biking"); // cls nr 5
+                        add("upstairs"); // cls nr 6
+                        add("downstairs"); // cls nr 7
+                    }
+                };
+                ArrayList<Attribute> attributeList = new ArrayList<Attribute>(2) {
+                    {
+                        add(accelerometerX);
+                        add(accelerometerY);
+                        add(accelerometerZ);
+                        add(linearX);
+                        add(linearY);
+                        add(linearZ);
+                        add(gyroscopeX);
+                        add(gyroscopeY);
+                        add(gyroscopeZ);
+//                        add(magnetometerX);
+//                        add(magnetometerY);
+//                        add(magnetometerZ);
+
+                        Attribute attributeClass = new Attribute("@@class@@", classes);
+                        add(attributeClass);
+
+
+                    }
+                };
+                Instances dataUnpredicted = new Instances("TestInstances",
+                        attributeList, 1);
+                dataUnpredicted.setClassIndex(dataUnpredicted.numAttributes() - 1);
+                DenseInstance newInstance = new DenseInstance(dataUnpredicted.numAttributes()) {
+                    {
+                        int acc=accelerometerReadings.size()-1;
+                        int lin=linearAcclReadings.size()-1;
+                        int gyro=gyroscopeReadings.size()-1;
+                        int mag=magnetometerReadings.size()-1;
+                        setValue(accelerometerX,accelerometerReadings.get(acc)[0]);
+                        setValue(accelerometerY,accelerometerReadings.get(acc)[1]);
+                        setValue(accelerometerZ,accelerometerReadings.get(acc)[2]);
+                        setValue(linearX,linearAcclReadings.get(lin)[0]);
+                        setValue(linearY,linearAcclReadings.get(lin)[1]);
+                        setValue(linearZ,linearAcclReadings.get(lin)[2]);
+                        setValue(gyroscopeX,gyroscopeReadings.get(gyro)[0]);
+                        setValue(gyroscopeY,gyroscopeReadings.get(gyro)[1]);
+                        setValue(gyroscopeZ,gyroscopeReadings.get(gyro)[2]);
+//                        setValue(magnetometerX,magnetometerReadings.get(mag)[0]);
+//                        setValue(magnetometerY,magnetometerReadings.get(mag)[1]);
+//                        setValue(magnetometerZ,magnetometerReadings.get(mag)[2]);
+                    }
+                };
+                newInstance.setDataset(dataUnpredicted);
+                try {
+                    double result = classifier.classifyInstance(newInstance);
+                    String className = classes.get(new Double(result).intValue());
+                    String msg = className ;
+                    System.out.println(msg);
+                    volleyPost(msg);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+//            if(!accelerometerReadings.equals(null)) {
+//
+//            }
+//                for(int i = 0; i < accelerometerReadings.size(); i++)
+//                    System.out.println( accelerometerReadings.get(i)[2] );
+//            }
+//            else{
+//                System.out.println("accelerometer list emty");
+//            }
 
 
             }
@@ -207,7 +307,10 @@ public class MainActivity extends AppCompatActivity {
             while(true){
                 displayFlag = true;
                 try {
-                    Thread.sleep(sensorDelay);
+                    Thread.sleep(200);
+                    guess();
+                    Thread.sleep(200);
+
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -224,13 +327,12 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-    public void volleyPost(int index){
+    public void volleyPost(String message){
         RequestQueue requestQueue = Volley.newRequestQueue(this);
-        String url="http://130.89.182.169:5000/handler";
+        String url="http://130.89.179.228:5000/handler";
         JSONObject postData = new JSONObject();
         try {
-            String activity=activities[0];
-            postData.put("activity",activity );
+            postData.put("activity",message );
 
         } catch (JSONException e) {
             e.printStackTrace();
@@ -252,6 +354,85 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+public void guess(){
+    final Attribute accelerometerX = new Attribute("accelerometerX");
+    final Attribute accelerometerY = new Attribute("accelerometerY");
+    final Attribute accelerometerZ = new Attribute("accelerometerZ");
+    final Attribute magnetometerX = new Attribute("magnetometerX");
+    final Attribute magnetometerY = new Attribute("magnetometerY");
+    final Attribute magnetometerZ = new Attribute("magnetometerZ");
+    final Attribute gyroscopeX = new Attribute("gyroscopeX");
+    final Attribute gyroscopeY = new Attribute("gyroscopeY");
+    final Attribute gyroscopeZ = new Attribute("gyroscopeZ");
+    final Attribute linearX = new Attribute("linearX");
+    final Attribute linearY = new Attribute("linearY");
+    final Attribute linearZ = new Attribute("linearZ");
+    final List<String> classes = new ArrayList<String>() {
+        {
+            add("walking"); // cls nr 1
+            add("standing"); // cls nr 2
+            add("jogging"); // cls nr 3
+            add("sitting"); // cls nr 4
+            add("biking"); // cls nr 5
+            add("upstairs"); // cls nr 6
+            add("downstairs"); // cls nr 7
+        }
+    };
+    ArrayList<Attribute> attributeList = new ArrayList<Attribute>(2) {
+        {
+            add(accelerometerX);
+            add(accelerometerY);
+            add(accelerometerZ);
+            add(linearX);
+            add(linearY);
+            add(linearZ);
+            add(gyroscopeX);
+            add(gyroscopeY);
+            add(gyroscopeZ);
+            add(magnetometerX);
+            add(magnetometerY);
+            add(magnetometerZ);
 
+            Attribute attributeClass = new Attribute("@@class@@", classes);
+            add(attributeClass);
+
+
+        }
+    };
+    Instances dataUnpredicted = new Instances("TestInstances",
+            attributeList, 1);
+    dataUnpredicted.setClassIndex(dataUnpredicted.numAttributes() - 1);
+    DenseInstance newInstance = new DenseInstance(dataUnpredicted.numAttributes()) {
+        {
+            int acc=accelerometerReadings.size()-1;
+            int lin=linearAcclReadings.size()-1;
+            int gyro=gyroscopeReadings.size()-1;
+            int mag=magnetometerReadings.size()-1;
+            setValue(accelerometerX,accelerometerReadings.get(acc)[0]);
+            setValue(accelerometerY,accelerometerReadings.get(acc)[1]);
+            setValue(accelerometerZ,accelerometerReadings.get(acc)[2]);
+            setValue(linearX,linearAcclReadings.get(lin)[0]);
+            setValue(linearY,linearAcclReadings.get(lin)[1]);
+            setValue(linearZ,linearAcclReadings.get(lin)[2]);
+            setValue(gyroscopeX,gyroscopeReadings.get(gyro)[0]);
+            setValue(gyroscopeY,gyroscopeReadings.get(gyro)[1]);
+            setValue(gyroscopeZ,gyroscopeReadings.get(gyro)[2]);
+            setValue(magnetometerX,magnetometerReadings.get(mag)[0]);
+            setValue(magnetometerY,magnetometerReadings.get(mag)[1]);
+            setValue(magnetometerZ,magnetometerReadings.get(mag)[2]);
+        }
+    };
+    newInstance.setDataset(dataUnpredicted);
+    try {
+        double result = classifier.classifyInstance(newInstance);
+        String className = classes.get(new Double(result).intValue());
+        String msg = "predicted: " + className ;
+        System.out.println(msg);
+        volleyPost(msg);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
 }
 
