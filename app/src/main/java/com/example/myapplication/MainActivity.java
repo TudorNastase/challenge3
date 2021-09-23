@@ -5,6 +5,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.view.View;
@@ -26,6 +28,8 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.LinkedList;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -36,12 +40,18 @@ public class MainActivity extends AppCompatActivity {
     private final int sensorDelay = 50;
     private boolean stopAndExport=true;
     private int fileCounter=0;
-    //final TextView textView = (TextView) findViewById(R.id.textView);
     public String[] activities={"walking","jogging","sitting","standing","upstairs","biking","downstairs"};
 
 
     LinkedList<Float[]> readings = new LinkedList<Float[]>();
-
+    LinkedList<Float[]> accelerometerReadings = new LinkedList<>();
+    private SensorListener accelerometerListener;
+    LinkedList<Float[]> magnetometerReadings = new LinkedList<>();
+    private SensorListener magnetometerListener;
+    LinkedList<Float[]> linearAcclReadings = new LinkedList<>();
+    private SensorListener linearAcclListener;
+    LinkedList<Float[]> gyroscopeReadings = new LinkedList<>();
+    private SensorListener gyroscopeListener;
 
 
 
@@ -52,10 +62,52 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        new Thread(sensorDelayer).start();
 
 
 
+
+
+        //start aldo code
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        if (accelerometer == null)
+            finish();
+        Sensor magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        if (magnetometer == null)
+            finish();
+        Sensor linearAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+        if (linearAccelerometer == null)
+            finish();
+        Sensor gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        if (gyroscope == null)
+            finish();
+
+        CyclicBarrier barrier = new CyclicBarrier(5);
+
+
+        accelerometerListener = new SensorListener(accelerometerReadings, new SensorDelayer(barrier));
+        sensorManager.registerListener(accelerometerListener,accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+        new Thread(accelerometerListener.delayer).start();
+
+        magnetometerListener = new SensorListener(magnetometerReadings, new SensorDelayer(barrier));;
+        sensorManager.registerListener(magnetometerListener, magnetometer, SensorManager.SENSOR_DELAY_FASTEST);
+        new Thread(magnetometerListener.delayer).start();
+
+        linearAcclListener = new SensorListener(linearAcclReadings, new SensorDelayer(barrier));;
+        sensorManager.registerListener(linearAcclListener, linearAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+        new Thread(linearAcclListener.delayer).start();
+
+        gyroscopeListener = new SensorListener(gyroscopeReadings, new SensorDelayer(barrier));;
+        sensorManager.registerListener(gyroscopeListener, gyroscope, SensorManager.SENSOR_DELAY_FASTEST);
+        new Thread(gyroscopeListener.delayer).start();
+
+        try {
+            barrier.await();
+        } catch (InterruptedException | BrokenBarrierException e) {
+            e.printStackTrace();
+        }
+
+        //end aldo code
 
 
 
@@ -78,9 +130,49 @@ public class MainActivity extends AppCompatActivity {
 //        });
     }
 
-    private final Runnable sensorDelayer = new Runnable() {
+
+
+
+
+    private class SensorListener implements SensorEventListener{
+        SensorDelayer delayer;
+        LinkedList<Float[]> storeReadings;
+
+        public SensorListener(LinkedList<Float[]> storingList , SensorDelayer delayer){
+            this.delayer = delayer;
+            storeReadings = storingList;
+        }
+
+        @Override
+        public void onSensorChanged(SensorEvent sensorEvent) {
+            if (delayer.displayFlag && !stopAndExport){
+                float [] value = sensorEvent.values;
+                storeReadings.add(new Float[]{value[0],value[1],value[2]});
+                delayer.displayFlag = false;
+            }
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int i) { }
+    }
+
+
+
+    private class SensorDelayer implements Runnable{
+        boolean displayFlag = true;
+        private CyclicBarrier barrier;
+
+        public SensorDelayer(CyclicBarrier barrier){
+            this.barrier = barrier;
+        }
+
         @Override
         public void run() {
+            try {
+                barrier.await();
+            } catch (BrokenBarrierException | InterruptedException e) {
+                e.printStackTrace();
+            }
             while(true){
                 displayFlag = true;
                 try {
@@ -90,7 +182,16 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-    };
+    }
+
+
+
+
+
+
+
+
+
 
     public void volleyPost(int index){
         RequestQueue requestQueue = Volley.newRequestQueue(this);
@@ -119,17 +220,7 @@ public class MainActivity extends AppCompatActivity {
         requestQueue.add(jsonObjectRequest);
 
     }
-    public final void onSensorChanged(SensorEvent event) {
-        if (event.sensor == accelerometer && !stopAndExport){ // won't do anything while stopAndExport is true
-        Float[] arr=new Float[3];
-        arr[0]=event.values[0];
-        arr[1]=event.values[1];
-        arr[2]=event.values[2];
-        readings.add(arr);
-        //add the
-        }
-    }
-    public void createCSV(){
-        //TODO: copy the contents of the readings list to a new csv file.
-    }
+
+
 }
+
