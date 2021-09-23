@@ -67,7 +67,6 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        //start aldo code
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         if (accelerometer == null)
