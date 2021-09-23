@@ -5,8 +5,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.view.View;
@@ -27,9 +25,19 @@ import org.json.JSONObject;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.util.LinkedList;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
+
+import weka.classifiers.Classifier;
+import weka.core.Attribute;
+import weka.core.DenseInstance;
+import weka.core.Instances;
+import weka.classifiers.trees.RandomForest;
+import weka.classifiers.trees.RandomTree;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -40,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private final int sensorDelay = 50;
     private boolean stopAndExport=true;
     private int fileCounter=0;
+    //final TextView textView = (TextView) findViewById(R.id.textView);
     public String[] activities={"walking","jogging","sitting","standing","upstairs","biking","downstairs"};
 
 
@@ -56,12 +65,22 @@ public class MainActivity extends AppCompatActivity {
 
 
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        InputStream in = getResources().openRawResource(R.raw.r_pocket_random_tree);
+        try {
+            RandomTree rf = (RandomTree) (new ObjectInputStream(in)).readObject();
+            System.out.println(rf);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
 
 
