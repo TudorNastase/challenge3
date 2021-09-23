@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.view.View;
@@ -45,8 +46,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean displayFlag;
     private SensorManager sensorManager;
     private Sensor accelerometer;
-    private final int sensorDelay = 50;
-    private boolean stopAndExport=true;
+    private final int sensorDelay = 20;
+    private boolean stopAndExport=false;
     private int fileCounter=0;
     //final TextView textView = (TextView) findViewById(R.id.textView);
     public String[] activities={"walking","jogging","sitting","standing","upstairs","biking","downstairs"};
@@ -72,15 +73,18 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+
+        //print model
         InputStream in = getResources().openRawResource(R.raw.r_pocket_random_tree);
-        try {
-            RandomTree rf = (RandomTree) (new ObjectInputStream(in)).readObject();
-            System.out.println(rf);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            //RandomTree rf = (RandomTree) (new ObjectInputStream(in)).readObject();
+//            //System.out.println(rf);
+//        } catch (ClassNotFoundException e) {
+//            e.printStackTrace();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
 
 
@@ -137,22 +141,31 @@ public class MainActivity extends AppCompatActivity {
                 volleyPost(0);
             }
         });
-//
-//        //the stop button sets the stopAndExport boolean to false, therby stopping the recording and creating a csv
-//        Button stopButton = (Button) findViewById(R.id.button2);
-//        stopButton.setOnClickListener(new View.OnClickListener() {
-//            public void onClick(View v) {
-//            stopAndExport=true;
-//            createCSV();
-//            }
-//        });
+
+        //the stop button sets the stopAndExport boolean to false, therby stopping the recording and creating a csv
+        Button stopButton = (Button) findViewById(R.id.button2);
+        stopButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+            System.out.println("the readings:");
+            if(!accelerometerReadings.equals(null)) {
+
+                for(int i = 0; i < accelerometerReadings.size(); i++)
+                    System.out.println( accelerometerReadings.get(i)[2] );
+            }
+            else{
+                System.out.println("accelerometer list emty");
+            }
+
+
+            }
+        });
     }
 
 
 
 
 
-    private class SensorListener implements SensorEventListener{
+    private class SensorListener implements SensorEventListener {
         SensorDelayer delayer;
         LinkedList<Float[]> storeReadings;
 
