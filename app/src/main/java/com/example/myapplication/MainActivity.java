@@ -31,9 +31,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
@@ -47,6 +50,7 @@ import weka.classifiers.trees.RandomTree;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int SAMPLE_SIZE = 50;
     private boolean displayFlag;
     private SensorManager sensorManager;
     private Sensor accelerometer;
@@ -154,8 +158,15 @@ public class MainActivity extends AppCompatActivity {
         Button startButton = (Button) findViewById(R.id.button);
         startButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                //send request
-                volleyPost("nothing");
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                DoStuff doStuff= new DoStuff();
+                doStuff.start();
+
             }
         });
 
@@ -259,8 +270,42 @@ public class MainActivity extends AppCompatActivity {
 
             }
         });
+
+
+
+
     }
 
+    public String mostFrequent(ArrayList<String> arr){
+        HashMap<String,Integer> map=new HashMap<String,Integer>();
+        map.put("walking",0);
+        map.put("biking",0);
+        map.put("sitting",0);
+        map.put("upstairs",0);
+        map.put("downstairs",0);
+        map.put("jogging",0);
+        map.put("standing",0);
+        map.put("nothing",0);
+        String mostFrequentKey=null;
+        if (arr.size()>=SAMPLE_SIZE) {
+
+            for (String k:arr) {
+                int val = map.get(k);
+                map.replace(k, val + 1);
+            }
+
+            int maxi =0;
+
+            for (Map.Entry<String,Integer>entry:map.entrySet()){
+                if(entry.getValue()>maxi){
+                    maxi=entry.getValue();
+                    mostFrequentKey=entry.getKey();
+                }
+            }
+
+        }
+        return mostFrequentKey;
+    }
 
 
 
@@ -307,9 +352,7 @@ public class MainActivity extends AppCompatActivity {
             while(true){
                 displayFlag = true;
                 try {
-                    Thread.sleep(200);
-                    guess();
-                    Thread.sleep(200);
+                    Thread.sleep(50);
 
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -354,7 +397,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-public void guess(){
+public String guess(){
     final Attribute accelerometerX = new Attribute("accelerometerX");
     final Attribute accelerometerY = new Attribute("accelerometerY");
     final Attribute accelerometerZ = new Attribute("accelerometerZ");
@@ -426,12 +469,38 @@ public void guess(){
     try {
         double result = classifier.classifyInstance(newInstance);
         String className = classes.get(new Double(result).intValue());
-        String msg = "predicted: " + className ;
-        System.out.println(msg);
-        volleyPost(msg);
+
+        return className;
 
     } catch (Exception e) {
         e.printStackTrace();
+    }
+    return "nothing";
+}
+public class DoStuff extends Thread {
+
+        public ArrayList<String> readingsG= new ArrayList<String>();
+
+
+    @Override
+    public void run() {
+        ArrayList<String> readings=new ArrayList<String>();
+        while(true){
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            String reading=guess();
+            readings.add(reading);
+            String postMessage=mostFrequent(readings);
+            if(postMessage!=(null)){
+                volleyPost(postMessage);
+                readings=new ArrayList<String>();
+            }
+
+        }
+
     }
 }
 }
